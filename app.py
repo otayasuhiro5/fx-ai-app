@@ -192,7 +192,42 @@ timeframe = st.selectbox("時間足", ["5分", "15分", "1時間", "4時間", "�
 symbols = {"USD/JPY": "USDJPY=X", "EUR/USD": "EURUSD=X", "GBP/JPY": "GBPJPY=X", "EUR/JPY": "EURJPY=X"}
 periods = {"5分": ("5d", "5m"), "15分": ("5d", "15m"), "1時間": ("1mo", "1h"), "4時間": ("3mo", "1h"), "日足": ("1y", "1d")}
 
-tabs = st.tabs(["サイン", "バックテスト"])
+
+# フォワードテスト機能
+if "forward_tests" not in st.session_state:
+    st.session_state.forward_tests = []
+
+def check_forward_results(current_price, pair):
+    updated = []
+    for test in st.session_state.forward_tests:
+        if test["結果"] != "待機中":
+            updated.append(test)
+            continue
+        if test["通貨ペア"] != pair:
+            updated.append(test)
+            continue
+        entry = test["エントリー価格"]
+        tp = test["TP"]
+        sl = test["SL"]
+        sign = test["サイン"]
+        if sign == "BUY":
+            if current_price >= tp:
+                test["結果"] = "勝"
+                test["損益pips"] = round(tp - entry, 4)
+            elif current_price <= sl:
+                test["結果"] = "負"
+                test["損益pips"] = round(sl - entry, 4)
+        elif sign == "SELL":
+            if current_price <= tp:
+                test["結果"] = "勝"
+                test["損益pips"] = round(entry - tp, 4)
+            elif current_price >= sl:
+                test["結果"] = "負"
+                test["損益pips"] = round(entry - sl, 4)
+        updated.append(test)
+    st.session_state.forward_tests = updated
+
+tabs = st.tabs(["サイン", "バックテスト", "フォワードテスト"])
 
 with tabs[0]:
     with st.spinner("価格取得・AI学習中..."):
@@ -359,4 +394,78 @@ with tabs[1]:
         if os.path.exists(SCALER_FILE):
             os.remove(SCALER_FILE)
         st.success("次回更新時に再学習します")
+    st.caption("このアプリは投資アドバイスではありません")
+
+with tabs[2]:
+    st.subheader("フォワードテスト")
+
+    if "base" in dir() or True:
+        try:
+            check_forward_results(base, pair)
+        except:
+            pass
+
+    if st.button("現在のサインをフォワードテストに登録", use_container_width=True):
+        try:
+            if sign != "WAIT":
+                if sign == "BUY":
+                    tp_f = round(base + atr * 2, 4)
+                    sl_f = round(base - atr * 1.5, 4)
+                else:
+                    tp_f = round(base - atr * 2, 4)
+                    sl_f = round(base + atr * 1.5, 4)
+                st.session_state.forward_tests.insert(0, {
+                    "登録時刻": datetime.now().strftime("%H:%M:%S"),
+                    "通貨ペア": pair,
+                    "サイン": sign,
+                    "エントリー価格": base,
+                    "TP": tp_f,
+                    "SL": sl_f,
+                    "信頼度": str(confidence) + "%",
+                    "結果": "待機中",
+                    "損益pips": "-"
+                })
+                st.success(sign + " を登録しました！価格が TP/SL に達したら自動判定されます")
+            else:
+                st.warning("WAITサインは登録できません")
+        except:
+            st.error("まずサインタブで価格を取得してください")
+
+    st.divider()
+
+    if st.session_state.forward_tests:
+        ft_df = pd.DataFrame(st.session_state.forward_tests)
+        wins = len(ft_df[ft_df["結果"] == "勝"])
+        losses = len(ft_df[ft_df["結果"] == "負"])
+        waiting = len(ft_df[ft_df["結果"] == "待機中"])
+        total = wins + losses
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("勝ち", str(wins) + "回")
+        col2.metric("負け", str(losses) + "回")
+        col3.metric("待機中", str(waiting) + "回")
+        col4.metric("勝率", str(round(wins/total*100, 1)) + "%" if total > 0 else "-")
+
+        if total > 0:
+            completed = ft_df[ft_df["結果"] != "待機中"].copy()
+            if len(completed) > 0:
+                completed["損益pips"] = pd.to_numeric(completed["損益pips"], errors="coerce")
+                fig_fw = go.Figure()
+                fig_fw.add_trace(go.Bar(
+                    x=list(range(len(completed))),
+                    y=completed["損益pips"],
+                    marker_color=["green" if v > 0 else "red" for v in completed["損益pips"]],
+                    name="損益"
+                ))
+                fig_fw.update_layout(title="フォワードテスト損益", height=250, paper_bgcolor="white", plot_bgcolor="white")
+                st.plotly_chart(fig_fw, use_container_width=True)
+
+        st.dataframe(ft_df, use_container_width=True)
+
+        if st.button("フォワードテスト履歴をクリア", use_container_width=True):
+            st.session_state.forward_tests = []
+            st.success("クリアしました")
+    else:
+        st.info("まだ登録がありません。サインタブでサインを確認後、登録ボタンを押してください。")
+
     st.caption("このアプリは投資アドバイスではありません")
