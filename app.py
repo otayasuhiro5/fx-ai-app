@@ -1,11 +1,10 @@
 import streamlit as st
-
 import plotly.graph_objects as go
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import pandas_ta as ta
+import ta
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
@@ -19,8 +18,6 @@ st.title("FX AI サインアプリ")
 
 if "history" not in st.session_state:
     st.session_state.history = []
-if "last_sign" not in st.session_state:
-    st.session_state.last_sign = None
 
 MODEL_FILE = "fx_model.pkl"
 SCALER_FILE = "fx_scaler.pkl"
@@ -50,29 +47,29 @@ def get_news_sentiment(pair):
 
 def build_features(df):
     df = df.copy()
-    df["RSI"] = ta.rsi(df["Close"], length=14)
+    df["RSI"] = ta.momentum.RSIIndicator(df["Close"], window=14).rsi()
     df["RSI_prev"] = df["RSI"].shift(1)
     df["RSI_diff"] = df["RSI"] - df["RSI_prev"]
-    stoch = ta.stoch(df["High"], df["Low"], df["Close"])
-    df["STOCH_k"] = stoch.iloc[:, 0]
-    df["STOCH_d"] = stoch.iloc[:, 1]
-    macd = ta.macd(df["Close"])
-    df["MACD"] = macd.iloc[:, 0]
-    df["MACD_signal"] = macd.iloc[:, 1]
-    df["MACD_hist"] = df["MACD"] - df["MACD_signal"]
-    bb = ta.bbands(df["Close"], length=20)
-    df["BB_upper"] = bb.iloc[:, 0]
-    df["BB_mid"] = bb.iloc[:, 1]
-    df["BB_lower"] = bb.iloc[:, 2]
+    macd = ta.trend.MACD(df["Close"])
+    df["MACD"] = macd.macd()
+    df["MACD_signal"] = macd.macd_signal()
+    df["MACD_hist"] = macd.macd_diff()
+    bb = ta.volatility.BollingerBands(df["Close"], window=20)
+    df["BB_upper"] = bb.bollinger_hband()
+    df["BB_mid"] = bb.bollinger_mavg()
+    df["BB_lower"] = bb.bollinger_lband()
     df["BB_width"] = df["BB_upper"] - df["BB_lower"]
-    df["BB_pct"] = (df["Close"] - df["BB_lower"]) / df["BB_width"]
-    df["EMA20"] = ta.ema(df["Close"], length=20)
-    df["EMA50"] = ta.ema(df["Close"], length=50)
-    df["EMA200"] = ta.ema(df["Close"], length=200)
+    df["BB_pct"] = bb.bollinger_pband()
+    df["EMA20"] = ta.trend.EMAIndicator(df["Close"], window=20).ema_indicator()
+    df["EMA50"] = ta.trend.EMAIndicator(df["Close"], window=50).ema_indicator()
+    df["EMA200"] = ta.trend.EMAIndicator(df["Close"], window=200).ema_indicator()
     df["EMA_diff"] = df["EMA20"] - df["EMA50"]
     df["EMA_trend"] = df["EMA50"] - df["EMA200"]
-    df["ATR"] = ta.atr(df["High"], df["Low"], df["Close"], length=14)
+    df["ATR"] = ta.volatility.AverageTrueRange(df["High"], df["Low"], df["Close"], window=14).average_true_range()
     df["ATR_pct"] = df["ATR"] / df["Close"]
+    stoch = ta.momentum.StochasticOscillator(df["High"], df["Low"], df["Close"])
+    df["STOCH_k"] = stoch.stoch()
+    df["STOCH_d"] = stoch.stoch_signal()
     df["momentum"] = df["Close"] - df["Close"].shift(5)
     df["momentum_10"] = df["Close"] - df["Close"].shift(10)
     df["volatility"] = df["Close"].rolling(10).std()
@@ -115,9 +112,9 @@ def train_and_save(df):
     scaler = StandardScaler()
     X_train_s = scaler.fit_transform(X_train)
     X_test_s = scaler.transform(X_test)
-    rf = RandomForestClassifier(n_estimators=300, max_depth=8, min_samples_leaf=5, random_state=42)
-    xgb = XGBClassifier(n_estimators=300, max_depth=5, learning_rate=0.03, subsample=0.8, colsample_bytree=0.8, random_state=42, eval_metric="logloss")
-    gb = GradientBoostingClassifier(n_estimators=200, max_depth=5, learning_rate=0.05, random_state=42)
+    rf = RandomForestClassifier(n_estimators=200, max_depth=6, random_state=42)
+    xgb = XGBClassifier(n_estimators=200, max_depth=4, learning_rate=0.05, random_state=42, eval_metric="logloss")
+    gb = GradientBoostingClassifier(n_estimators=100, max_depth=4, random_state=42)
     ensemble = VotingClassifier(estimators=[("rf", rf), ("xgb", xgb), ("gb", gb)], voting="soft", weights=[1, 2, 1])
     ensemble.fit(X_train_s, y_train)
     acc = round(accuracy_score(y_test, ensemble.predict(X_test_s)) * 100, 1)
@@ -168,11 +165,10 @@ def run_backtest(df, model, scaler):
         price = df["Close"].iloc[i]
         atr = df["ATR"].iloc[i]
         won = (pred == 1 and actual == 1) or (pred == 0 and actual == 0)
+        pnl = atr * 2 if won else -atr * 1.5
         if won:
-            pnl = atr * 2
             wins += 1
         else:
-            pnl = -atr * 1.5
             losses += 1
         capital += pnl * 100
         results.append({
@@ -192,11 +188,6 @@ def run_backtest(df, model, scaler):
 
 pair = st.selectbox("通貨ペア", ["USD/JPY", "EUR/USD", "GBP/JPY", "EUR/JPY"])
 timeframe = st.selectbox("時間足", ["5分", "15分", "1時間", "4時間", "日足"])
-auto_refresh = st.toggle("自動更新（5分ごと）", value=False)
-
-if auto_refresh:
-    
-    st.info("自動更新ON - 5分ごとに更新されます")
 
 symbols = {"USD/JPY": "USDJPY=X", "EUR/USD": "EURUSD=X", "GBP/JPY": "GBPJPY=X", "EUR/JPY": "EURJPY=X"}
 periods = {"5分": ("5d", "5m"), "15分": ("5d", "15m"), "1時間": ("1mo", "1h"), "4時間": ("3mo", "1h"), "日足": ("1y", "1d")}
@@ -213,10 +204,8 @@ with tabs[0]:
             if raw.empty:
                 st.error("価格データが取得できませんでした")
                 st.stop()
-
             df = build_features(raw)
             df = df.dropna()
-
             base = round(float(df["Close"].iloc[-1]), 4)
             rsi = round(float(df["RSI"].iloc[-1]), 1)
             macd_val = round(float(df["MACD"].iloc[-1]), 4)
@@ -228,17 +217,14 @@ with tabs[0]:
             bb_lower = float(df["BB_lower"].iloc[-1])
             stoch_k = round(float(df["STOCH_k"].iloc[-1]), 1)
             bb_pct = round(float(df["BB_pct"].iloc[-1]), 2)
-
             news_score, news_label = get_news_sentiment(pair)
             model, scaler, acc = load_or_train(df)
-
             if model:
                 last = scaler.transform(df[FEATURES].iloc[-1].values.reshape(1, -1))
                 ai_pred = model.predict(last)[0]
                 ai_proba = model.predict_proba(last)[0]
                 ai_direction = "UP" if ai_pred == 1 else "DOWN"
                 ai_confidence = round(max(ai_proba) * 100, 1)
-
                 score = 0
                 if rsi < 30: score += 2
                 elif rsi > 70: score -= 2
@@ -254,38 +240,13 @@ with tabs[0]:
                 elif ai_direction == "DOWN": score -= 3
                 if news_score > 0.1: score += 1
                 elif news_score < -0.1: score -= 1
-
                 if score >= 2:
                     sign = "BUY"
                 elif score <= -2:
                     sign = "SELL"
                 else:
                     sign = "WAIT"
-
                 confidence = min(95, 45 + abs(score) * 5 + int(ai_confidence * 0.3))
-
-                if sign != st.session_state.last_sign:
-                    st.session_state.last_sign = sign
-                    if sign != "WAIT":
-                        if sign == "BUY":
-                            tp = round(base + atr * 2, 4)
-                            sl = round(base - atr * 1.5, 4)
-                        else:
-                            tp = round(base - atr * 2, 4)
-                            sl = round(base + atr * 1.5, 4)
-                        st.session_state.history.insert(0, {
-                            "時刻": datetime.now().strftime("%H:%M:%S"),
-                            "通貨ペア": pair,
-                            "サイン": sign,
-                            "信頼度": str(confidence) + "%",
-                            "価格": base,
-                            "RSI": rsi,
-                            "AI予測": ai_direction,
-                            "ニュース": news_label,
-                            "TP": tp,
-                            "SL": sl
-                        })
-                        st.session_state.history = st.session_state.history[:20]
             else:
                 ai_direction = "UNKNOWN"
                 ai_confidence = 0.0
@@ -298,17 +259,14 @@ with tabs[0]:
             col2.metric("STOCH", stoch_k)
             col3.metric("BB%", bb_pct)
             col4.metric("AI精度", str(acc) + "%")
-
             col5, col6 = st.columns(2)
             col5.metric("EMA20", ema20)
             col6.metric("ATR", atr)
-
             st.divider()
             col7, col8 = st.columns(2)
             arrow = "上昇予測" if ai_direction == "UP" else "下降予測"
             col7.info("AI: " + arrow + " " + str(ai_confidence) + "%")
             col8.info("ニュース: " + news_label)
-
             if sign == "BUY":
                 st.success("BUY  信頼度: " + str(confidence) + "%")
                 tp = round(base + atr * 2, 4)
@@ -325,41 +283,31 @@ with tabs[0]:
                 col2.metric("SL損切", sl)
             else:
                 st.warning("WAIT  信頼度: " + str(confidence) + "%")
-
             st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
-
             fig = go.Figure()
-            fig.add_trace(go.Candlestick(
-                x=df.index, open=df["Open"], high=df["High"],
-                low=df["Low"], close=df["Close"],
-                increasing_line_color="green", decreasing_line_color="red",
-                name="ローソク足"
-            ))
+            fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="green", decreasing_line_color="red", name="ローソク足"))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_upper"], line=dict(color="blue", width=1, dash="dash"), name="BB上限"))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_lower"], line=dict(color="blue", width=1, dash="dash"), name="BB下限"))
             fig.add_trace(go.Scatter(x=df.index, y=df["EMA20"], line=dict(color="orange", width=1), name="EMA20"))
             fig.add_trace(go.Scatter(x=df.index, y=df["EMA50"], line=dict(color="purple", width=1), name="EMA50"))
             fig.update_layout(title=pair + " " + timeframe + "チャート", height=400, xaxis_rangeslider_visible=False, paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
-
             fig2 = go.Figure()
             fig2.add_trace(go.Scatter(x=df.index, y=df["RSI"], line=dict(color="green"), name="RSI"))
             fig2.add_hline(y=70, line_dash="dash", line_color="red")
             fig2.add_hline(y=30, line_dash="dash", line_color="blue")
             fig2.update_layout(title="RSI", height=200, paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig2, use_container_width=True)
-
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(x=df.index, y=df["MACD"], line=dict(color="blue"), name="MACD"))
             fig3.add_trace(go.Scatter(x=df.index, y=df["MACD_signal"], line=dict(color="red"), name="シグナル"))
             fig3.update_layout(title="MACD", height=200, paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig3, use_container_width=True)
-
         except Exception as e:
             st.error("エラー: " + str(e))
             st.stop()
 
-    if st.button("手動でAIサインを生成", use_container_width=True):
+    if st.button("手動でサインを再確認", use_container_width=True):
         if sign == "BUY":
             st.success("BUY  信頼度: " + str(confidence) + "%")
         elif sign == "SELL":
@@ -374,7 +322,6 @@ with tabs[0]:
         st.dataframe(hist_df, use_container_width=True)
     else:
         st.info("まだ履歴がありません")
-
     st.caption("このアプリは投資アドバイスではありません")
 
 with tabs[1]:
@@ -399,25 +346,17 @@ with tabs[1]:
                     col2.metric("勝ち", str(wins) + "回")
                     col3.metric("負け", str(losses) + "回")
                     col4.metric("総損益", str(total_pnl) + "円")
-
                     fig_bt = go.Figure()
-                    fig_bt.add_trace(go.Scatter(
-                        x=rdf["時刻"], y=rdf["累計資金"],
-                        line=dict(color="green" if total_pnl >= 0 else "red", width=2),
-                        name="累計資金"
-                    ))
+                    fig_bt.add_trace(go.Scatter(x=rdf["時刻"], y=rdf["累計資金"], line=dict(color="green" if total_pnl >= 0 else "red", width=2), name="累計資金"))
                     fig_bt.update_layout(title="資金推移", height=300, paper_bgcolor="white", plot_bgcolor="white")
                     st.plotly_chart(fig_bt, use_container_width=True)
-                    st.subheader("取引履歴")
                     st.dataframe(rdf, use_container_width=True)
             except Exception as e:
                 st.error("エラー: " + str(e))
-
     if st.button("モデルを強制再学習", use_container_width=True):
         if os.path.exists(MODEL_FILE):
             os.remove(MODEL_FILE)
         if os.path.exists(SCALER_FILE):
             os.remove(SCALER_FILE)
         st.success("次回更新時に再学習します")
-
     st.caption("このアプリは投資アドバイスではありません")
