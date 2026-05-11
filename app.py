@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
+
 import plotly.graph_objects as go
 import yfinance as yf
 import pandas as pd
@@ -195,7 +195,7 @@ timeframe = st.selectbox("時間足", ["5分", "15分", "1時間", "4時間", "�
 auto_refresh = st.toggle("自動更新（5分ごと）", value=False)
 
 if auto_refresh:
-    count = st_autorefresh(interval=300000, limit=None, key="autorefresh")
+    
     st.info("自動更新ON - 5分ごとに更新されます")
 
 symbols = {"USD/JPY": "USDJPY=X", "EUR/USD": "EURUSD=X", "GBP/JPY": "GBPJPY=X", "EUR/JPY": "EURJPY=X"}
