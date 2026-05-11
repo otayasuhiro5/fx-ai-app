@@ -2,10 +2,10 @@ streamlit
 yfinance
 pandas
 numpy
-pandas-ta
 scikit-learn
 xgboost
 plotly
 requests
 joblib
 streamlit-autorefresh
+pandas_ta
