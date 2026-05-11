@@ -7,4 +7,4 @@ xgboost
 plotly
 requests
 joblib
-pandas_ta
+ta
