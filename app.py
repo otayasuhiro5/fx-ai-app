@@ -318,11 +318,13 @@ with tabs[0]:
                 col2.metric("SL損切", sl)
             else:
                 st.warning("WAIT  信頼度: " + str(confidence) + "%")
-            import json
-    try:
+            try:
+        import json
         signal_data = {"signal": sign, "atr": float(atr), "confidence": int(confidence), "price": float(base)}
         with open('/root/fx-ai-app/signal.json', 'w') as f:
             json.dump(signal_data, f)
+    except:
+        pass
     except:
         pass
     st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
