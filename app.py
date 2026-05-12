@@ -325,8 +325,6 @@ with tabs[0]:
             json.dump(signal_data, f)
     except:
         pass
-    except:
-        pass
     st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="green", decreasing_line_color="red", name="ローソク足"))
