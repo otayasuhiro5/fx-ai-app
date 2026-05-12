@@ -177,3 +177,22 @@ with tabs[2]:
         st.info("まだ登録がありません。サインタブでサインを確認後、登録ボタンを押してください。")
 
     st.caption("このアプリは投資アドバイスではありません")
+
+# シグナルAPI
+from flask import Flask, jsonify
+import threading
+
+def run_api():
+    api = Flask(__name__)
+    
+    @api.route('/signal')
+    def signal():
+        return jsonify({
+            "signal": st.session_state.get("last_sign", "WAIT"),
+            "atr": st.session_state.get("last_atr", 0.05),
+            "confidence": st.session_state.get("last_confidence", 50)
+        })
+    
+    api.run(host='0.0.0.0', port=5000)
+
+threading.Thread(target=run_api, daemon=True).start()
