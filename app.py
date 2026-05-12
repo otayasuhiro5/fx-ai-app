@@ -302,12 +302,7 @@ with tabs[0]:
             arrow = "上昇予測" if ai_direction == "UP" else "下降予測"
             col7.info("AI: " + arrow + " " + str(ai_confidence) + "%")
             col8.info("ニュース: " + news_label)
-            import json
-    signal_data = {"signal": sign, "atr": atr, "confidence": confidence, "price": base}
-    with open('/root/fx-ai-app/signal.json', 'w') as f:
-        json.dump(signal_data, f)
-
-    if sign == "BUY":
+            if sign == "BUY":
                 st.success("BUY  信頼度: " + str(confidence) + "%")
                 tp = round(base + atr * 2, 4)
                 sl = round(base - atr * 1.5, 4)
@@ -323,7 +318,14 @@ with tabs[0]:
                 col2.metric("SL損切", sl)
             else:
                 st.warning("WAIT  信頼度: " + str(confidence) + "%")
-            st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
+            import json
+    try:
+        signal_data = {"signal": sign, "atr": float(atr), "confidence": int(confidence), "price": float(base)}
+        with open('/root/fx-ai-app/signal.json', 'w') as f:
+            json.dump(signal_data, f)
+    except:
+        pass
+    st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="green", decreasing_line_color="red", name="ローソク足"))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_upper"], line=dict(color="blue", width=1, dash="dash"), name="BB上限"))
