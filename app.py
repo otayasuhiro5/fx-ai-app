@@ -302,7 +302,12 @@ with tabs[0]:
             arrow = "上昇予測" if ai_direction == "UP" else "下降予測"
             col7.info("AI: " + arrow + " " + str(ai_confidence) + "%")
             col8.info("ニュース: " + news_label)
-            if sign == "BUY":
+            import json
+    signal_data = {"signal": sign, "atr": atr, "confidence": confidence, "price": base}
+    with open('/root/fx-ai-app/signal.json', 'w') as f:
+        json.dump(signal_data, f)
+
+    if sign == "BUY":
                 st.success("BUY  信頼度: " + str(confidence) + "%")
                 tp = round(base + atr * 2, 4)
                 sl = round(base - atr * 1.5, 4)
