@@ -13,9 +13,9 @@ import os
 import requests
 
 SYMBOL = "USDJPY=X"
-MODEL_FILE = "/root/fx-ai-app/fx_model.pkl"
-SCALER_FILE = "/root/fx-ai-app/fx_scaler.pkl"
-SIGNAL_FILE = "/root/fx-ai-app/signal.json"
+MODEL_FILE = "C:/fx_model.pkl"
+SCALER_FILE = "C:/fx_scaler.pkl"
+SIGNAL_FILE = "C:/signal.json"
 
 FEATURES = [
     "RSI", "RSI_prev", "RSI_diff", "STOCH_k", "STOCH_d",
