@@ -318,14 +318,7 @@ with tabs[0]:
                 col2.metric("SL損切", sl)
             else:
                 st.warning("WAIT  信頼度: " + str(confidence) + "%")
-            try:
-        import json
-        signal_data = {"signal": sign, "atr": float(atr), "confidence": int(confidence), "price": float(base)}
-        with open('/root/fx-ai-app/signal.json', 'w') as f:
-            json.dump(signal_data, f)
-    except:
-        pass
-    st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
+            st.caption("最終更新: " + datetime.now().strftime("%H:%M:%S"))
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="green", decreasing_line_color="red", name="ローソク足"))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_upper"], line=dict(color="blue", width=1, dash="dash"), name="BB上限"))
