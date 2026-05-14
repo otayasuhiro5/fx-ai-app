@@ -13,7 +13,7 @@ import time
 import json
 
 SYMBOL = "USDJPY"
-RISK_PERCENT = 0.001
+RISK_PERCENT = 0.000001
 MAGIC = 12345
 MODEL_FILE = "C:/fx_model_v2.pkl"
 SCALER_FILE = "C:/fx_scaler_v2.pkl"
