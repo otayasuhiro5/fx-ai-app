@@ -13,7 +13,7 @@ import time
 import json
 
 SYMBOL = "USDJPY"
-RISK_PERCENT = 0.000001
+RISK_PERCENT = 0.001
 MAGIC = 12345
 MODEL_FILE = "C:/fx_model_v2.pkl"
 SCALER_FILE = "C:/fx_scaler_v2.pkl"
@@ -264,19 +264,17 @@ while True:
                 model, scaler, acc = train_model(df, learn_data)
                 retrain_counter = 0
 
-        if sign in ["BUY", "SELL"] and sign != last_signal:
+        positions = mt5.positions_get(symbol=SYMBOL)
+        has_position = positions is not None and len(positions) > 0
+
+        if sign in ["BUY", "SELL"] and not has_position:
             print("新しいサイン！注文実行中...")
-            close_all_orders()
-            time.sleep(1)
             if tp > 0 and sl > 0:
                 place_order(sign, tp, sl)
                 last_signal = sign
                 last_position_price = base
-        elif sign == "WAIT" and last_signal in ["BUY", "SELL"]:
-            print("WAITサイン - クローズ")
-            close_all_orders()
-            last_signal = "WAIT"
-            last_position_price = None
+        elif has_position:
+            print("ポジション保有中 TP/SL待機...")
 
     except Exception as e:
         print(datetime.now().strftime("%H:%M:%S"), "エラー:", e)
