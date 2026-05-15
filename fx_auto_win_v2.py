@@ -170,6 +170,7 @@ print("通貨ペア:", SYMBOL)
 print("リスク:", RISK_PERCENT * 100, "%")
 
 mt5.initialize()
+mt5.symbol_select("USDJPYm", True)
 last_signal = None
 last_position_price = None
 learn_data = load_learn_data()
