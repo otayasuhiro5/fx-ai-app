@@ -12,13 +12,13 @@ import os
 import time
 import json
 
-SYMBOL = "USDJPY"
+SYMBOL = "USDJPYm"
 RISK_PERCENT = 0.000001
 MAGIC = 12345
 MODEL_FILE = "C:/fx_model_v2.pkl"
 SCALER_FILE = "C:/fx_scaler_v2.pkl"
 LEARN_FILE = "C:/fx_learn_data.json"
-SPREAD = 0.026
+SPREAD = 0.012
 
 FEATURES = [
     "RSI", "RSI_prev", "RSI_diff", "STOCH_k", "STOCH_d",
