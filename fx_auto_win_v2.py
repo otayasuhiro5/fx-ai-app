@@ -239,12 +239,12 @@ while True:
 
         if sign == "BUY":
             entry = round(base + SPREAD, 4)
-            tp = round(entry + atr * 2, 4)
-            sl = round(entry - atr * 1.5, 4)
+            tp = round(entry + 0.04, 4)
+            sl = round(entry - 0.03, 4)
         elif sign == "SELL":
             entry = round(base - SPREAD, 4)
-            tp = round(entry - atr * 2, 4)
-            sl = round(entry + atr * 1.5, 4)
+            tp = round(entry - 0.04, 4)
+            sl = round(entry + 0.03, 4)
         else:
             tp = sl = 0
 
